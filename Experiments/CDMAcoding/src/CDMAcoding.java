@@ -9,6 +9,7 @@ public class CDMAcoding {
 
 	static int[][] code = new int[256][100];  //8位码片的编码
 	static int[] num = new int[10];  //保存随机生成5位数
+	static int[] vis = new int[256];  //判重
 	
 	public static void main(String[] args) {
 		getCode();  // 得到8位码片的所有编码
@@ -20,12 +21,13 @@ public class CDMAcoding {
 				if(check(j,num[i]) == 0)  //检查是否与Mi正交
 					res[ans++] = j; 
 			}
-			System.out.printf("CDMA码:");
+			System.out.printf("CDMA码:%d\n",num[i]);
 			out(num[i]);
 			System.out.printf("total:%d\n\n",ans);
 			for(int k = 0; k < 10; k++) 
 				out(res[k]);
 			System.out.println("\n");
+			
 		}
 	}
 	static void out(int a) {  //以8位编码形式输出
@@ -48,9 +50,15 @@ public class CDMAcoding {
 	}		
 	static int check(int a, int b) { //检查两码片是否正交
 		int sum = 0;
+		//out(a);
+		//out(b);
 		for(int i = 0; i < 8; i++) {
 			sum += code[a][i]*code[b][i];
+			//System.out.print("sum " + sum + " ");
 		}
+		//System.out.print("\n");
+		
+		//System.out.printf("%d %d %d\n\n", a,b,sum);
 		return sum; //如果各位相乘和为0，则正交
 	}
 	static void createCode() { //随机生成5位两两互不正交的码片
@@ -59,13 +67,18 @@ public class CDMAcoding {
 			Boolean flag = true;
 			int random = (int) (256 * Math.random());
 			//System.out.println(random);
+			if(vis[random] != 0)
+					continue;
 			for(int i = 0; i < cnt; i++) {
-				if(check(i,cnt) == 0) {  
+				//System.out.printf("%d %d %d\n", num[i],random,check(num[i],random));
+				if(check(num[i],random) == 0) {  
 					flag = false;break;
 				}
 			}
-			if(flag) 
+			if(flag == true) { 
 				num[cnt++] = random;
+				vis[random] = 1;
+			}
 			
 		}while(cnt < 5);	
 	}
