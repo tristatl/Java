@@ -1,0 +1,181 @@
+#include "mainwindow.h"
+#include "ui_mainwindow.h"
+#include "QtNetwork/QTcpSocket"
+#include <QMessageBox>
+#include <iostream>
+using namespace std;
+
+
+MainWindow::MainWindow(QWidget *parent) :
+    QMainWindow(parent),
+    ui(new Ui::MainWindow)
+{
+    ui->setupUi(this);
+
+}
+
+MainWindow::~MainWindow()
+{
+    delete ui;
+}
+
+//连接，开始发送
+void MainWindow::on_pushButton_clicked()
+{
+    //cout << 123 << endl;
+    this->socket = new QTcpSocket(this);
+    this->socket->connectToHost("127.0.0.1",8888,QTcpSocket::ReadWrite);
+    connect(this->socket,SIGNAL(connected()),this,SLOT(run()));
+}
+
+void MainWindow::run(){
+    //QMessageBox::about(this,"提示","连接成功");
+    QString send_wind_size_str = ui->lineEdit_3->text();
+    QString send_time_str = ui->lineEdit_4->text();
+    QString resed_tim_str = ui->lineEdit_5->text();
+    QString error_seq_str = ui->lineEdit->text();
+    QString lost_seq_str = ui->lineEdit_2->text();
+
+    int seq[100]={0};
+    QStringList error_str_list = error_seq_str.split(',');
+    QStringList timeout_str_list = lost_seq_str.split(',');
+    for(QString a:error_str_list){
+        seq[a.toInt()]=1;
+    }
+    for(QString a:timeout_str_list){
+        seq[a.toInt()]=2;
+    }
+
+    //有出错帧
+    //int is_err = ui->checkBox->checkState();
+    //有丢失帧
+    //int is_lost = ui->checkBox2->checkState();
+
+    int send_wind_size = send_wind_size_str.toInt();
+    int send_time = send_time_str.toInt();
+    int resed_tim = resed_tim_str.toInt();
+
+    //发送信息格式
+    //当前时间  发送数据  发送/重发  正常/数据帧错误/数据帧丢失  当前发送帧
+    //time  data   sent/resent   normal/chkerr/lost   seq_id
+
+    int now_seq = 0;
+    int last_acked_seq = 0;
+
+
+    //是否重发
+    //bool resend = is_re_send();
+    bool resend = false;
+    int resend_seq = 0;
+
+    while(1){
+        QTime start_tim = QTime::currentTime();
+        QString send_info;
+        //重发
+        if(resend){
+            // 当前时间 和 data
+            send_info = start_tim.toString();
+            send_info += "data";
+            //重发
+            send_info += "re_send";
+            //发送帧的状态
+            send_info += "normal";
+            //当前发送帧的序号
+            send_info += QString::number(resend_seq%send_wind_size);
+
+        }
+        //在可发送窗口内
+        else if(now_seq < last_acked_seq + send_wind_size){
+
+            // 当前时间 和 data
+             send_info = start_tim.toString();
+             send_info += "data";
+            // 发送
+            send_info += "send";
+            //发送帧的状态
+            if(seq[now_seq%send_wind_size] == 0){
+                send_info += "normal";
+            }
+            else if(seq[now_seq%send_wind_size] == 1){
+                send_info += "error";
+            }
+            else{
+                send_info += "lost";
+            }
+            //当前发送帧的序号
+            send_info += QString::number(now_seq%send_wind_size);
+         }
+         //发送
+         std::string send_info_str = send_info.toStdString();
+         this->socket->write(send_info_str.c_str(),strlen(send_info_str.c_str()));
+         if(!resend) now_seq++;
+
+        //接收信息格式
+        //当前时间  接收/否定帧   已到达  正常/应答数据帧错误  nak帧序号/已确认收到的数
+        //time  ack/nak  arrived  normal/chkerr  seq_id
+
+       QByteArray rec_info = this->socket->readAll();
+       QDataStream dst(rec_info);
+       QString str;
+       //(*dst) >> str;
+       //this->ui->listWidget->setText();
+
+       //判断是否超时,超时重传
+       QTime arr_tim = QTime::currentTime();
+       int interval = start_tim.msecsTo(arr_tim);
+       if(interval > resed_tim){
+
+       }
+
+       //判断是否是nak,否认帧重传
+       if(str.section(' ',1,1) == "nak"){
+           resend = true;
+           resend_seq = str.section(' ',4,4).toInt();
+       }
+       //更新滑动窗口可发送的数据帧
+       else if(str.section(' ',1,1) == "ack"){
+           last_acked_seq = str.section(' ',4,4).toInt();
+       }
+
+    }
+
+}
+
+/*
+bool MainWindow::is_re_send(){
+
+    //重发数据帧有两种情况
+    //1.收到nak否认帧，2.发送帧超时
+}
+
+void MainWindow::Send(int seq){
+
+}
+
+viod MainWindow::Recv(){
+    //接收信息格式
+    //当前时间  接收/否定帧   已到达  正常/数据帧错误  已确认收到的数
+    //time  ack/nak  arrived  normal/chkerr  seq_id
+
+   QByteArray rec_info = this->socket->readAll();
+   QDataStream dst(rec_info);
+   QString str;
+   (*qds) >> str;
+   //this->ui->listWidget->setText();
+
+   //判断是否超时
+   //判断是否是nak
+   //更新滑动窗口
+
+}
+*/
+
+void MainWindow::on_exit_clicked()
+{
+    QApplication::exit();
+}
+
+void MainWindow::on_pushButton_2_clicked()
+{
+    this->socket->close();
+}
